@@ -385,6 +385,160 @@ export function addBroadcastTools(
 
   if (appBaseUrl && apiKey) {
     server.registerTool(
+      'connect-to-broadcast',
+      {
+        title: 'Connect to Broadcast',
+        description: `**Purpose:** Connect to a broadcast and retrieve its full context — current editor content, metadata, verified domains, and audience info. This is the FIRST tool to call when a user wants to work on a broadcast in the live editor.
+
+**NOT for:** Creating or sending broadcasts. Not for pushing content (use write-to-broadcast-editor after connecting).
+
+**Returns:** Full broadcast context including current document state, verified sender domains, and contextual next-step guidance.
+
+**When to use:**
+- User says "connect to broadcast", "open my broadcast", "let's work on this email"
+- ALWAYS call this before write-to-broadcast-editor to understand the current state
+- Use this to get broadcast ID if the user provides a name instead of ID
+
+**Workflow:** connect-to-broadcast → (understand context) → write-to-broadcast-editor`,
+        inputSchema: {
+          broadcastId: z
+            .string()
+            .nonempty()
+            .describe(
+              'Broadcast ID to connect to. Use list-broadcasts first if the user provides a name instead of an ID.',
+            ),
+        },
+      },
+      async ({ broadcastId }) => {
+        // Fetch broadcast details and verified domains in parallel
+        const [broadcastResponse, domainsResponse] = await Promise.all([
+          resend.broadcasts.get(broadcastId),
+          resend.domains.list(),
+        ]);
+
+        if (broadcastResponse.error) {
+          throw new Error(
+            `Failed to get broadcast: ${JSON.stringify(broadcastResponse.error)}`,
+          );
+        }
+
+        const broadcast = broadcastResponse.data;
+        const domains = domainsResponse.error
+          ? []
+          : domainsResponse.data.data.filter(
+              (d) => d.status === 'verified',
+            );
+
+        // Determine document state
+        const hasHtmlContent =
+          broadcast.html !== null && broadcast.html.trim().length > 0;
+        const hasTextContent =
+          broadcast.text !== null && broadcast.text.trim().length > 0;
+        const hasContent = hasHtmlContent || hasTextContent;
+        const isSent = broadcast.status === 'sent';
+        const isScheduled = broadcast.scheduled_at !== null;
+
+        // Build context sections
+        const sections: string[] = [];
+
+        // 1. Broadcast metadata
+        sections.push(
+          [
+            `## Connected to Broadcast`,
+            `- **Name:** ${broadcast.name}`,
+            `- **ID:** ${broadcast.id}`,
+            `- **Status:** ${broadcast.status}`,
+            broadcast.subject && `- **Subject:** ${broadcast.subject}`,
+            broadcast.from && `- **From:** ${broadcast.from}`,
+            broadcast.preview_text &&
+              `- **Preview text:** ${broadcast.preview_text}`,
+            broadcast.audience_id &&
+              `- **Audience ID:** ${broadcast.audience_id}`,
+            broadcast.scheduled_at &&
+              `- **Scheduled at:** ${broadcast.scheduled_at}`,
+            broadcast.sent_at && `- **Sent at:** ${broadcast.sent_at}`,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        );
+
+        // 2. Verified domains
+        if (domains.length > 0) {
+          sections.push(
+            `## Verified Domains\n${domains.map((d) => `- ${d.name} (${d.region})`).join('\n')}`,
+          );
+        }
+
+        // 3. Current content
+        if (hasContent) {
+          sections.push(`## Current Content`);
+          if (hasTextContent) {
+            sections.push(
+              `### Plain Text\n${broadcast.text!.substring(0, 2000)}${broadcast.text!.length > 2000 ? '\n...(truncated)' : ''}`,
+            );
+          }
+          if (hasHtmlContent) {
+            sections.push(
+              `### HTML (excerpt)\n${broadcast.html!.substring(0, 3000)}${broadcast.html!.length > 3000 ? '\n...(truncated)' : ''}`,
+            );
+          }
+        } else {
+          sections.push(
+            `## Current Content\nThe document is **empty** — no content has been written yet.`,
+          );
+        }
+
+        // 4. Contextual guidance for the AI
+        let guidance: string;
+
+        if (isSent) {
+          guidance = `## Context & Next Steps
+This broadcast was already **sent** on ${broadcast.sent_at}. You cannot edit it directly.
+- Offer to create a new broadcast based on this one's content
+- Suggest improvements for the next version`;
+        } else if (isScheduled) {
+          guidance = `## Context & Next Steps
+This broadcast is **scheduled** for ${broadcast.scheduled_at}.
+- The user may want to review or adjust content before it sends
+- Ask what they'd like to change — preserve the existing structure unless told otherwise`;
+        } else if (!hasContent) {
+          guidance = `## Context & Next Steps
+This is a **fresh broadcast** with no content yet. Before generating content, you need to understand the brand:
+
+1. **Ask the user for brand context** — use one of these approaches:
+   - "Do you have a website or brand guidelines URL I can reference for your brand's look and feel?" (design guidelines URL — extract colors, logo, typography, tone)
+   - "Tell me about your brand — what colors, logo, and tone do you use?"
+
+2. **Important: Distinguish URL types when the user provides a URL:**
+   - **Design/brand URL** (e.g. homepage, brand guide, about page): Extract design tokens (colors, logo, typography, tone) to style the email. Apply to \`globalContent\` styles.
+   - **Content URL** (e.g. blog post, product page, changelog): Extract the actual content/copy to use IN the email body. Still ask for brand styling separately.
+   - If unclear, ask: "Should I use this URL for your brand's design style, or should I pull the content from this page into the email?"
+
+3. **For text-only emails** (plain newsletter, no heavy branding): Use the default "basic" theme with minimal globalContent — no need for brand extraction.
+
+4. **Always create a meaningful, branded design** — avoid generic templates. Use the brand's actual colors in globalContent body/container backgrounds, button colors, link colors, etc.`;
+        } else {
+          guidance = `## Context & Next Steps
+This broadcast has **existing content**. The user likely wants to edit or improve it.
+- Ask what they'd like to change — design, copy, structure, or specific sections
+- When editing, preserve the existing structure and only modify what's requested
+- If the user provides a URL: clarify if it's for design reference or for pulling content into the email`;
+        }
+
+        sections.push(guidance);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: sections.join('\n\n'),
+            },
+          ],
+        };
+      },
+    );
+
+    server.registerTool(
       'write-to-broadcast-editor',
       {
         title: 'Write to Broadcast Editor (Live)',
@@ -395,11 +549,11 @@ export function addBroadcastTools(
 **Returns:** Confirmation that content was pushed to the live editor.
 
 **When to use:**
-- User wants to collaboratively edit a broadcast in the live editor
+- After calling connect-to-broadcast to understand the current state
 - User wants to see AI-generated content appear in real-time in their editor
 - User says "write this in the editor", "update the editor", "push this to the broadcast editor"
 
-**Before generating content:** If the user has not already provided a \`designGuidelinesUrl\`, ask them: "Do you have a brand or design guidelines URL I should follow? (e.g. https://brand.yourcompany.com). If not, I'll use the default design guidelines."
+**IMPORTANT:** Always call connect-to-broadcast FIRST before using this tool. The connect tool gives you the broadcast's current state, verified domains, and contextual guidance for what to build.
 
 **Content format:** Tiptap JSON document format. The content must be a valid Tiptap JSON document with a top-level "doc" type and an array of content nodes (paragraphs, headings, etc).
 
