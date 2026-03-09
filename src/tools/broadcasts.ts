@@ -59,6 +59,74 @@ async function startLiveSession(
   scheduleSessionEnd(broadcastId, appBaseUrl, apiKey);
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Delay between each node push (ms) — fast enough to feel live, slow enough to see
+const STREAM_DELAY_MS = 150;
+
+/**
+ * Pushes a TipTap document to the editor node-by-node, creating a
+ * progressive "streaming" effect. Each push sends a growing document
+ * so the editor shows content appearing incrementally.
+ */
+async function streamContentToEditor(
+  broadcastId: string,
+  content: Record<string, unknown>,
+  sessionName: string | undefined,
+  appBaseUrl: string,
+  apiKey: string,
+) {
+  const url = `${appBaseUrl}/api/broadcasts/${broadcastId}/live-edit`;
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+
+  const docContent = Array.isArray(content.content) ? content.content : [];
+
+  // If the document has 2 or fewer nodes, just push the whole thing
+  if (docContent.length <= 2) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ content, sessionName }),
+    });
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(
+        `Failed to write to broadcast editor (${response.status}): ${errorBody}`,
+      );
+    }
+    return;
+  }
+
+  // Push progressively: globalContent first, then add one node at a time
+  for (let i = 1; i <= docContent.length; i++) {
+    const partialDoc = {
+      ...content,
+      content: docContent.slice(0, i),
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ content: partialDoc, sessionName }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(
+        `Failed to write to broadcast editor (${response.status}): ${errorBody}`,
+      );
+    }
+
+    // Don't delay after the last node
+    if (i < docContent.length) {
+      await sleep(STREAM_DELAY_MS);
+    }
+  }
+}
+
 export function addBroadcastTools(
   server: McpServer,
   resend: Resend,
@@ -1049,22 +1117,14 @@ Always include a footer with:
         },
       },
       async ({ broadcastId, content, sessionName }) => {
-        const url = `${appBaseUrl}/api/broadcasts/${broadcastId}/live-edit`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ content, sessionName }),
-        });
-
-        if (!response.ok) {
-          const errorBody = await response.text();
-          throw new Error(
-            `Failed to write to broadcast editor (${response.status}): ${errorBody}`,
-          );
-        }
+        // Stream content node-by-node for a live "typing" effect
+        await streamContentToEditor(
+          broadcastId,
+          content,
+          sessionName,
+          appBaseUrl!,
+          apiKey!,
+        );
 
         // Reset the inactivity timer — avatar stays visible for another 5 minutes
         scheduleSessionEnd(broadcastId, appBaseUrl!, apiKey!);
