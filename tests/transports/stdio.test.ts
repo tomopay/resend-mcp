@@ -28,10 +28,11 @@ describe('runStdio', () => {
     const resend = {} as Resend;
     await runStdio(resend, { replierEmailAddresses: [] });
     const { createMcpServer } = await import('../../src/server.js');
-    expect(createMcpServer).toHaveBeenCalledWith(resend, {
-      senderEmailAddress: undefined,
-      replierEmailAddresses: [],
-    });
+    expect(createMcpServer).toHaveBeenCalledWith(
+      resend,
+      { senderEmailAddress: undefined, replierEmailAddresses: [] },
+      undefined,
+    );
     expect(mockConnect).toHaveBeenCalledTimes(1);
   });
 
@@ -42,10 +43,14 @@ describe('runStdio', () => {
       replierEmailAddresses: ['a@x.com', 'b@x.com'],
     });
     const { createMcpServer } = await import('../../src/server.js');
-    expect(createMcpServer).toHaveBeenCalledWith(resend, {
-      senderEmailAddress: 'x@r.dev',
-      replierEmailAddresses: ['a@x.com', 'b@x.com'],
-    });
+    expect(createMcpServer).toHaveBeenCalledWith(
+      resend,
+      {
+        senderEmailAddress: 'x@r.dev',
+        replierEmailAddresses: ['a@x.com', 'b@x.com'],
+      },
+      undefined,
+    );
   });
 
   it('rejects when server.connect rejects', async () => {

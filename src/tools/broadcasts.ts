@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Resend } from 'resend';
 import { z } from 'zod';
+import type { DashboardClient } from '../lib/dashboard-client.js';
 
 export function addBroadcastTools(
   server: McpServer,
@@ -8,9 +9,11 @@ export function addBroadcastTools(
   {
     senderEmailAddress,
     replierEmailAddresses,
+    dashboard,
   }: {
     senderEmailAddress?: string;
     replierEmailAddresses: string[];
+    dashboard?: DashboardClient;
   },
 ) {
   server.registerTool(
@@ -54,6 +57,12 @@ export function addBroadcastTools(
           .string()
           .optional()
           .describe('Preview text for the email'),
+        content: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            'TipTap JSON content for editable email body. Call get-tiptap-schema first to get the schema reference. When provided, the email is editable in the Resend dashboard editor. Cannot be used with html/text.',
+          ),
         ...(!senderEmailAddress
           ? {
               from: z.email().nonempty().describe('From email address'),
@@ -76,11 +85,41 @@ export function addBroadcastTools(
       text,
       html,
       previewText,
+      content,
       from,
       replyTo,
     }) => {
       const fromEmailAddress = from ?? senderEmailAddress;
       const replyToEmailAddresses = replyTo ?? replierEmailAddresses;
+
+      // When content (TipTap JSON) is provided, route through the Dashboard Agent API
+      if (content && dashboard) {
+        const result = await dashboard.createBroadcast({
+          name,
+          content,
+          subject,
+          from: typeof fromEmailAddress === 'string' ? fromEmailAddress : undefined,
+          html,
+          text,
+          preview_text: previewText,
+          audience_id: audienceId,
+          reply_to: Array.isArray(replyToEmailAddresses)
+            ? replyToEmailAddresses
+            : replyToEmailAddresses
+              ? [replyToEmailAddresses]
+              : undefined,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Broadcast created with editable TipTap content.',
+            },
+            { type: 'text', text: `ID: ${result.id}` },
+          ],
+        };
+      }
 
       // Type check on from, since "from" is optionally included in the arguments schema
       // This should never happen.
@@ -340,6 +379,12 @@ export function addBroadcastTools(
           .string()
           .optional()
           .describe('Preview text for the email'),
+        content: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            'TipTap JSON content for editable email body. Call get-tiptap-schema first to get the schema reference.',
+          ),
       },
     },
     async ({
@@ -352,7 +397,33 @@ export function addBroadcastTools(
       subject,
       replyTo,
       previewText,
+      content,
     }) => {
+      // When content (TipTap JSON) is provided, route through the Dashboard Agent API
+      if (content && dashboard) {
+        const result = await dashboard.updateBroadcast(id, {
+          name,
+          content,
+          subject,
+          from,
+          html,
+          text,
+          preview_text: previewText,
+          audience_id: audienceId,
+          reply_to: replyTo,
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Broadcast updated with editable TipTap content.',
+            },
+            { type: 'text', text: `ID: ${result.id}` },
+          ],
+        };
+      }
+
       const response = await resend.broadcasts.update(id, {
         name,
         audienceId,

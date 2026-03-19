@@ -51,9 +51,18 @@ export function resolveConfig(
 
   const port = parsePort(parsed, env);
 
+  const dashboardUrl =
+    (typeof parsed['dashboard-url'] === 'string'
+      ? parsed['dashboard-url']
+      : null) ??
+    (typeof env.RESEND_DASHBOARD_URL === 'string'
+      ? env.RESEND_DASHBOARD_URL.trim() || undefined
+      : undefined);
+
   const base = {
     senderEmailAddress: senderEmailAddress ?? '',
     replierEmailAddresses: parseReplierAddresses(parsed, env),
+    dashboardUrl,
     port,
   };
 
