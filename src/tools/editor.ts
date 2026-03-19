@@ -2,10 +2,18 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { DashboardClient } from '../lib/dashboard-client.js';
 
+interface EditorConnection {
+  resourceType: 'broadcast' | 'template';
+  resourceId: string;
+  agentName?: string;
+}
+
 export function addEditorTools(
   server: McpServer,
   dashboard?: DashboardClient,
 ) {
+  let activeConnection: EditorConnection | null = null;
+
   server.registerTool(
     'get-tiptap-schema',
     {
@@ -74,6 +82,8 @@ export function addEditorTools(
         agentName,
       });
 
+      activeConnection = { resourceType, resourceId, agentName };
+
       return {
         content: [
           { type: 'text', text: 'Connected to editor successfully.' },
@@ -98,7 +108,21 @@ export function addEditorTools(
         );
       }
 
-      await dashboard.disconnectEditor();
+      if (!activeConnection) {
+        return {
+          content: [
+            { type: 'text', text: 'No active editor connection to disconnect.' },
+          ],
+        };
+      }
+
+      await dashboard.disconnectEditor({
+        resourceType: activeConnection.resourceType,
+        resourceId: activeConnection.resourceId,
+        agentName: activeConnection.agentName,
+      });
+
+      activeConnection = null;
 
       return {
         content: [
@@ -107,4 +131,6 @@ export function addEditorTools(
       };
     },
   );
+
+  return { getActiveConnection: () => activeConnection };
 }

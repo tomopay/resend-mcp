@@ -68,6 +68,7 @@ export class DashboardClient {
       preview_text?: string;
       audience_id?: string | null;
       topic_id?: string | null;
+      session_name?: string;
     },
   ): Promise<{ id: string; status: string; updated_at: string }> {
     return this.request('PATCH', `/broadcasts/${id}`, data);
@@ -85,7 +86,11 @@ export class DashboardClient {
     return this.request('POST', '/editor/connect', data);
   }
 
-  async disconnectEditor(): Promise<{ ok: boolean }> {
-    return this.request('POST', '/editor/disconnect', {});
+  async disconnectEditor(data: {
+    resourceType: 'broadcast' | 'template';
+    resourceId: string;
+    agentName?: string;
+  }): Promise<{ ok: boolean }> {
+    return this.request('POST', '/editor/disconnect', data);
   }
 }

@@ -10,10 +10,12 @@ export function addBroadcastTools(
     senderEmailAddress,
     replierEmailAddresses,
     dashboard,
+    getAgentName,
   }: {
     senderEmailAddress?: string;
     replierEmailAddresses: string[];
     dashboard?: DashboardClient;
+    getAgentName?: () => string | undefined;
   },
 ) {
   server.registerTool(
@@ -411,6 +413,7 @@ export function addBroadcastTools(
           preview_text: previewText,
           audience_id: audienceId,
           reply_to: replyTo,
+          session_name: getAgentName?.(),
         });
 
         return {
