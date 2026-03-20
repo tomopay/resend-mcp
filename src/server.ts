@@ -33,7 +33,10 @@ export function createMcpServer(
     ? new DashboardClient(apiKey, dashboardUrl)
     : undefined;
 
-  const { getActiveConnection } = addEditorTools(server, dashboard);
+  const { getActiveConnection, withEditorSession } = addEditorTools(
+    server,
+    dashboard,
+  );
 
   addApiKeyTools(server, resend);
   addBroadcastTools(server, resend, {
@@ -41,6 +44,7 @@ export function createMcpServer(
     replierEmailAddresses,
     dashboard,
     getAgentName: () => getActiveConnection()?.agentName,
+    withEditorSession,
   });
   addContactPropertyTools(server, resend);
   addContactTools(server, resend);

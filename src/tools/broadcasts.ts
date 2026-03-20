@@ -11,11 +11,20 @@ export function addBroadcastTools(
     replierEmailAddresses,
     dashboard,
     getAgentName,
+    withEditorSession,
   }: {
     senderEmailAddress?: string;
     replierEmailAddresses: string[];
     dashboard?: DashboardClient;
     getAgentName?: () => string | undefined;
+    withEditorSession?: <T>(
+      conn: {
+        resourceType: 'broadcast' | 'template';
+        resourceId: string;
+        agentName?: string;
+      },
+      fn: () => Promise<T>,
+    ) => Promise<T>;
   },
 ) {
   server.registerTool(
@@ -111,6 +120,19 @@ export function addBroadcastTools(
               ? [replyToEmailAddresses]
               : undefined,
         });
+
+        // Connect → push content to Liveblocks room → disconnect
+        if (withEditorSession) {
+          const agentName = getAgentName?.();
+          await withEditorSession(
+            { resourceType: 'broadcast', resourceId: result.id, agentName },
+            () =>
+              dashboard.updateBroadcast(result.id, {
+                content,
+                session_name: agentName,
+              }),
+          );
+        }
 
         return {
           content: [
@@ -402,19 +424,30 @@ export function addBroadcastTools(
       content,
     }) => {
       // When content (TipTap JSON) is provided, route through the Dashboard Agent API
+      // wrapped in an editor session so the AI avatar shows up automatically
       if (content && dashboard) {
-        const result = await dashboard.updateBroadcast(id, {
-          name,
-          content,
-          subject,
-          from,
-          html,
-          text,
-          preview_text: previewText,
-          audience_id: audienceId,
-          reply_to: replyTo,
-          session_name: getAgentName?.(),
-        });
+        const agentName = getAgentName?.();
+
+        const doUpdate = () =>
+          dashboard.updateBroadcast(id, {
+            name,
+            content,
+            subject,
+            from,
+            html,
+            text,
+            preview_text: previewText,
+            audience_id: audienceId,
+            reply_to: replyTo,
+            session_name: agentName,
+          });
+
+        const result = withEditorSession
+          ? await withEditorSession(
+              { resourceType: 'broadcast', resourceId: id, agentName },
+              doUpdate,
+            )
+          : await doUpdate();
 
         return {
           content: [
