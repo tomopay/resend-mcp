@@ -78,6 +78,54 @@ export class DashboardClient {
     return this.request('GET', `/broadcasts/${id}`);
   }
 
+  async createTemplate(data: {
+    name: string;
+    content?: Record<string, unknown>;
+    subject?: string;
+    from?: string;
+    html?: string;
+    text?: string;
+    reply_to?: string[];
+    preview_text?: string;
+  }): Promise<{
+    id: string;
+    version_id: string;
+    created_at: string;
+    status: string;
+  }> {
+    return this.request('POST', '/templates', data);
+  }
+
+  async updateTemplate(
+    id: string,
+    data: {
+      name?: string;
+      content?: Record<string, unknown>;
+      subject?: string;
+      from?: string;
+      html?: string;
+      text?: string;
+      reply_to?: string[];
+      preview_text?: string;
+      session_name?: string;
+    },
+  ): Promise<{
+    id: string;
+    version_id: string;
+    status: string;
+    updated_at: string;
+  }> {
+    return this.request('PATCH', `/templates/${id}`, data);
+  }
+
+  async getTemplate(id: string): Promise<Record<string, unknown>> {
+    return this.request('GET', `/templates/${id}`);
+  }
+
+  async listTemplates(): Promise<{ data: Record<string, unknown>[] }> {
+    return this.request('GET', '/templates');
+  }
+
   async connectEditor(data: {
     resourceType: 'broadcast' | 'template';
     resourceId: string;

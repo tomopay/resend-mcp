@@ -11,6 +11,7 @@ import {
   addEditorTools,
   addEmailTools,
   addSegmentTools,
+  addTemplateTools,
   addTopicTools,
   addWebhookTools,
 } from './tools/index.js';
@@ -51,6 +52,11 @@ export function createMcpServer(
   addDomainTools(server, resend);
   addEmailTools(server, resend, { senderEmailAddress, replierEmailAddresses });
   addSegmentTools(server, resend);
+  addTemplateTools(server, {
+    dashboard,
+    getAgentName: () => getActiveConnection()?.agentName,
+    withEditorSession,
+  });
   addTopicTools(server, resend);
   addWebhookTools(server, resend);
   return server;
