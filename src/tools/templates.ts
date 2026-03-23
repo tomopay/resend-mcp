@@ -1,17 +1,17 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Resend } from 'resend';
 import { z } from 'zod';
-import type { DashboardClient } from '../lib/dashboard-client.js';
+import type { ResendApiClient } from '../lib/resend-api-client.js';
 
 export function addTemplateTools(
   server: McpServer,
   resend: Resend,
   {
-    dashboard,
+    apiClient,
     getAgentName,
     withEditorSession,
   }: {
-    dashboard?: DashboardClient;
+    apiClient?: ResendApiClient;
     getAgentName?: () => string | undefined;
     withEditorSession?: <T>(
       conn: {
@@ -85,7 +85,7 @@ export function addTemplateTools(
       }
 
       // If TipTap content was provided, push it to the Liveblocks room
-      if (content && dashboard && withEditorSession) {
+      if (content && apiClient && withEditorSession) {
         const agentName = getAgentName?.();
         await withEditorSession(
           {
@@ -94,7 +94,7 @@ export function addTemplateTools(
             agentName,
           },
           () =>
-            dashboard.updateTemplateContent(response.data.id, {
+            apiClient.updateTemplateContent(response.data.id, {
               content,
               session_name: agentName,
             }),
@@ -243,12 +243,12 @@ export function addTemplateTools(
       }
 
       // If TipTap content was provided, push it to the Liveblocks room
-      if (content && dashboard && withEditorSession) {
+      if (content && apiClient && withEditorSession) {
         const agentName = getAgentName?.();
         await withEditorSession(
           { resourceType: 'template', resourceId: id, agentName },
           () =>
-            dashboard.updateTemplateContent(id, {
+            apiClient.updateTemplateContent(id, {
               content,
               session_name: agentName,
             }),

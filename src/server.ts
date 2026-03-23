@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Resend } from 'resend';
 import packageJson from '../package.json' with { type: 'json' };
 import { DashboardClient } from './lib/dashboard-client.js';
+import { ResendApiClient } from './lib/resend-api-client.js';
 import {
   addApiKeyTools,
   addBroadcastTools,
@@ -30,20 +31,23 @@ export function createMcpServer(
     version: packageJson.version,
   });
 
-  const dashboard = apiKey
-    ? new DashboardClient(apiKey, { dashboardUrl })
+  const dashboard = new DashboardClient({ dashboardUrl });
+
+  const apiClient = apiKey
+    ? new ResendApiClient(apiKey)
     : undefined;
 
   const { getActiveConnection, withEditorSession } = addEditorTools(
     server,
     dashboard,
+    apiClient,
   );
 
   addApiKeyTools(server, resend);
   addBroadcastTools(server, resend, {
     senderEmailAddress,
     replierEmailAddresses,
-    dashboard,
+    apiClient,
     getAgentName: () => getActiveConnection()?.agentName,
     withEditorSession,
   });
@@ -53,7 +57,7 @@ export function createMcpServer(
   addEmailTools(server, resend, { senderEmailAddress, replierEmailAddresses });
   addSegmentTools(server, resend);
   addTemplateTools(server, resend, {
-    dashboard,
+    apiClient,
     getAgentName: () => getActiveConnection()?.agentName,
     withEditorSession,
   });

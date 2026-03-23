@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { DashboardClient } from '../lib/dashboard-client.js';
+import type { ResendApiClient } from '../lib/resend-api-client.js';
 
 interface EditorConnection {
   resourceType: 'broadcast' | 'template';
@@ -11,6 +12,7 @@ interface EditorConnection {
 export function addEditorTools(
   server: McpServer,
   dashboard?: DashboardClient,
+  apiClient?: ResendApiClient,
 ) {
   let activeConnection: EditorConnection | null = null;
 
@@ -23,12 +25,12 @@ export function addEditorTools(
     conn: EditorConnection,
     fn: () => Promise<T>,
   ): Promise<T> {
-    if (!dashboard) {
+    if (!apiClient) {
       return fn();
     }
 
     try {
-      await dashboard.connectEditor(conn);
+      await apiClient.connectEditor(conn);
       activeConnection = conn;
     } catch {
       // best-effort — proceed even if connect fails
@@ -38,7 +40,7 @@ export function addEditorTools(
       return await fn();
     } finally {
       try {
-        await dashboard.disconnectEditor(conn);
+        await apiClient.disconnectEditor(conn);
       } catch {
         // best-effort
       }
@@ -102,13 +104,13 @@ export function addEditorTools(
       },
     },
     async ({ resourceType, resourceId, agentName }) => {
-      if (!dashboard) {
+      if (!apiClient) {
         throw new Error(
-          'Dashboard integration not configured. Provide a Resend API key.',
+          'API client not configured. Provide a Resend API key.',
         );
       }
 
-      const result = await dashboard.connectEditor({
+      const result = await apiClient.connectEditor({
         resourceType,
         resourceId,
         agentName,
@@ -134,9 +136,9 @@ export function addEditorTools(
       inputSchema: {},
     },
     async () => {
-      if (!dashboard) {
+      if (!apiClient) {
         throw new Error(
-          'Dashboard integration not configured. Provide a Resend API key.',
+          'API client not configured. Provide a Resend API key.',
         );
       }
 
@@ -148,7 +150,7 @@ export function addEditorTools(
         };
       }
 
-      await dashboard.disconnectEditor({
+      await apiClient.disconnectEditor({
         resourceType: activeConnection.resourceType,
         resourceId: activeConnection.resourceId,
         agentName: activeConnection.agentName,

@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Resend } from 'resend';
 import { z } from 'zod';
-import type { DashboardClient } from '../lib/dashboard-client.js';
+import type { ResendApiClient } from '../lib/resend-api-client.js';
 
 export function addBroadcastTools(
   server: McpServer,
@@ -9,13 +9,13 @@ export function addBroadcastTools(
   {
     senderEmailAddress,
     replierEmailAddresses,
-    dashboard,
+    apiClient,
     getAgentName,
     withEditorSession,
   }: {
     senderEmailAddress?: string;
     replierEmailAddresses: string[];
-    dashboard?: DashboardClient;
+    apiClient?: ResendApiClient;
     getAgentName?: () => string | undefined;
     withEditorSession?: <T>(
       conn: {
@@ -135,7 +135,7 @@ export function addBroadcastTools(
       }
 
       // If TipTap content was provided, push it to the Liveblocks room
-      if (content && dashboard && withEditorSession) {
+      if (content && apiClient && withEditorSession) {
         const agentName = getAgentName?.();
         await withEditorSession(
           {
@@ -144,7 +144,7 @@ export function addBroadcastTools(
             agentName,
           },
           () =>
-            dashboard.updateBroadcastContent(response.data.id, {
+            apiClient.updateBroadcastContent(response.data.id, {
               content,
               session_name: agentName,
             }),
@@ -416,12 +416,12 @@ export function addBroadcastTools(
       }
 
       // If TipTap content was provided, push it to the Liveblocks room
-      if (content && dashboard && withEditorSession) {
+      if (content && apiClient && withEditorSession) {
         const agentName = getAgentName?.();
         await withEditorSession(
           { resourceType: 'broadcast', resourceId: id, agentName },
           () =>
-            dashboard.updateBroadcastContent(id, {
+            apiClient.updateBroadcastContent(id, {
               content,
               session_name: agentName,
             }),
