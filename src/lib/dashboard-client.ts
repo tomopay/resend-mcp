@@ -19,39 +19,7 @@ export class DashboardClient {
   }
 
   /**
-   * Make a request to the Resend dashboard (Next.js app).
-   * Used only for endpoints that live on the dashboard, like the TipTap schema.
-   */
-  private async dashboardRequest<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<T> {
-    const url = `${this.dashboardUrl}/api/agent${path}`;
-    const response = await fetch(url, {
-      method,
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        error: response.statusText,
-      }));
-      throw new Error(
-        `Dashboard API error (${response.status}): ${error.error || response.statusText}`,
-      );
-    }
-
-    return response.json() as Promise<T>;
-  }
-
-  /**
    * Make a request to the Resend public API.
-   * Used for editor connect/disconnect and content updates with Liveblocks sync.
    */
   private async apiRequest<T>(
     method: string,
@@ -80,13 +48,16 @@ export class DashboardClient {
     return response.json() as Promise<T>;
   }
 
-  // ── Dashboard endpoints (resend.com) ──────────────────────────────
-
   async getTiptapSchema(): Promise<{ prompt: string; version: string }> {
-    return this.dashboardRequest('GET', '/tiptap-schema');
+    const url = `${this.dashboardUrl}/static/tiptap-schema.json`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch TipTap schema (${response.status}): ${response.statusText}`,
+      );
+    }
+    return response.json() as Promise<{ prompt: string; version: string }>;
   }
-
-  // ── Public API endpoints (api.resend.com) ─────────────────────────
 
   async connectEditor(data: {
     resourceType: 'broadcast' | 'template';
