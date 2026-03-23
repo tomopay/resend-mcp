@@ -103,48 +103,6 @@ export function addBroadcastTools(
       const fromEmailAddress = from ?? senderEmailAddress;
       const replyToEmailAddresses = replyTo ?? replierEmailAddresses;
 
-      // When content (TipTap JSON) is provided, route through the Dashboard Agent API
-      if (content && dashboard) {
-        const result = await dashboard.createBroadcast({
-          name,
-          content,
-          subject,
-          from: typeof fromEmailAddress === 'string' ? fromEmailAddress : undefined,
-          html,
-          text,
-          preview_text: previewText,
-          audience_id: audienceId,
-          reply_to: Array.isArray(replyToEmailAddresses)
-            ? replyToEmailAddresses
-            : replyToEmailAddresses
-              ? [replyToEmailAddresses]
-              : undefined,
-        });
-
-        // Connect → push content to Liveblocks room → disconnect
-        if (withEditorSession) {
-          const agentName = getAgentName?.();
-          await withEditorSession(
-            { resourceType: 'broadcast', resourceId: result.id, agentName },
-            () =>
-              dashboard.updateBroadcast(result.id, {
-                content,
-                session_name: agentName,
-              }),
-          );
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Broadcast created with editable TipTap content.',
-            },
-            { type: 'text', text: `ID: ${result.id}` },
-          ],
-        };
-      }
-
       // Type check on from, since "from" is optionally included in the arguments schema
       // This should never happen.
       if (typeof fromEmailAddress !== 'string') {
@@ -173,6 +131,23 @@ export function addBroadcastTools(
       if (response.error) {
         throw new Error(
           `Failed to create broadcast: ${JSON.stringify(response.error)}`,
+        );
+      }
+
+      // If TipTap content was provided, push it to the Liveblocks room
+      if (content && dashboard && withEditorSession) {
+        const agentName = getAgentName?.();
+        await withEditorSession(
+          {
+            resourceType: 'broadcast',
+            resourceId: response.data.id,
+            agentName,
+          },
+          () =>
+            dashboard.updateBroadcastContent(response.data.id, {
+              content,
+              session_name: agentName,
+            }),
         );
       }
 
@@ -423,43 +398,6 @@ export function addBroadcastTools(
       previewText,
       content,
     }) => {
-      // When content (TipTap JSON) is provided, route through the Dashboard Agent API
-      // wrapped in an editor session so the AI avatar shows up automatically
-      if (content && dashboard) {
-        const agentName = getAgentName?.();
-
-        const doUpdate = () =>
-          dashboard.updateBroadcast(id, {
-            name,
-            content,
-            subject,
-            from,
-            html,
-            text,
-            preview_text: previewText,
-            audience_id: audienceId,
-            reply_to: replyTo,
-            session_name: agentName,
-          });
-
-        const result = withEditorSession
-          ? await withEditorSession(
-              { resourceType: 'broadcast', resourceId: id, agentName },
-              doUpdate,
-            )
-          : await doUpdate();
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Broadcast updated with editable TipTap content.',
-            },
-            { type: 'text', text: `ID: ${result.id}` },
-          ],
-        };
-      }
-
       const response = await resend.broadcasts.update(id, {
         name,
         audienceId,
@@ -474,6 +412,19 @@ export function addBroadcastTools(
       if (response.error) {
         throw new Error(
           `Failed to update broadcast: ${JSON.stringify(response.error)}`,
+        );
+      }
+
+      // If TipTap content was provided, push it to the Liveblocks room
+      if (content && dashboard && withEditorSession) {
+        const agentName = getAgentName?.();
+        await withEditorSession(
+          { resourceType: 'broadcast', resourceId: id, agentName },
+          () =>
+            dashboard.updateBroadcastContent(id, {
+              content,
+              session_name: agentName,
+            }),
         );
       }
 

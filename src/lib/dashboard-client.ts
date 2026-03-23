@@ -1,20 +1,33 @@
 const DEFAULT_DASHBOARD_URL = 'https://resend.com';
+const DEFAULT_API_URL = 'https://api.resend.com';
 
 export class DashboardClient {
-  private baseUrl: string;
+  private dashboardUrl: string;
+  private apiUrl: string;
   private apiKey: string;
 
-  constructor(apiKey: string, dashboardUrl?: string) {
+  constructor(
+    apiKey: string,
+    options?: { dashboardUrl?: string; apiUrl?: string },
+  ) {
     this.apiKey = apiKey;
-    this.baseUrl = (dashboardUrl || DEFAULT_DASHBOARD_URL).replace(/\/$/, '');
+    this.dashboardUrl = (options?.dashboardUrl || DEFAULT_DASHBOARD_URL).replace(
+      /\/$/,
+      '',
+    );
+    this.apiUrl = (options?.apiUrl || DEFAULT_API_URL).replace(/\/$/, '');
   }
 
-  private async request<T>(
+  /**
+   * Make a request to the Resend dashboard (Next.js app).
+   * Used only for endpoints that live on the dashboard, like the TipTap schema.
+   */
+  private async dashboardRequest<T>(
     method: string,
     path: string,
     body?: unknown,
   ): Promise<T> {
-    const url = `${this.baseUrl}/api/agent${path}`;
+    const url = `${this.dashboardUrl}/api/agent${path}`;
     const response = await fetch(url, {
       method,
       headers: {
@@ -36,102 +49,51 @@ export class DashboardClient {
     return response.json() as Promise<T>;
   }
 
+  /**
+   * Make a request to the Resend public API.
+   * Used for editor connect/disconnect and content updates with Liveblocks sync.
+   */
+  private async apiRequest<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    const url = `${this.apiUrl}${path}`;
+    const response = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        error: response.statusText,
+      }));
+      throw new Error(
+        `API error (${response.status}): ${error.message || error.error || response.statusText}`,
+      );
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  // ── Dashboard endpoints (resend.com) ──────────────────────────────
+
   async getTiptapSchema(): Promise<{ prompt: string; version: string }> {
-    return this.request('GET', '/tiptap-schema');
+    return this.dashboardRequest('GET', '/tiptap-schema');
   }
 
-  async createBroadcast(data: {
-    name: string;
-    content?: Record<string, unknown>;
-    subject?: string;
-    from?: string;
-    html?: string;
-    text?: string;
-    reply_to?: string[];
-    preview_text?: string;
-    audience_id?: string;
-    topic_id?: string;
-  }): Promise<{ id: string; created_at: string; status: string }> {
-    return this.request('POST', '/broadcasts', data);
-  }
-
-  async updateBroadcast(
-    id: string,
-    data: {
-      name?: string;
-      content?: Record<string, unknown>;
-      subject?: string;
-      from?: string;
-      html?: string;
-      text?: string;
-      reply_to?: string[];
-      preview_text?: string;
-      audience_id?: string | null;
-      topic_id?: string | null;
-      session_name?: string;
-    },
-  ): Promise<{ id: string; status: string; updated_at: string }> {
-    return this.request('PATCH', `/broadcasts/${id}`, data);
-  }
-
-  async getBroadcast(id: string): Promise<Record<string, unknown>> {
-    return this.request('GET', `/broadcasts/${id}`);
-  }
-
-  async createTemplate(data: {
-    name: string;
-    content?: Record<string, unknown>;
-    subject?: string;
-    from?: string;
-    html?: string;
-    text?: string;
-    reply_to?: string[];
-    preview_text?: string;
-  }): Promise<{
-    id: string;
-    version_id: string;
-    created_at: string;
-    status: string;
-  }> {
-    return this.request('POST', '/templates', data);
-  }
-
-  async updateTemplate(
-    id: string,
-    data: {
-      name?: string;
-      content?: Record<string, unknown>;
-      subject?: string;
-      from?: string;
-      html?: string;
-      text?: string;
-      reply_to?: string[];
-      preview_text?: string;
-      session_name?: string;
-    },
-  ): Promise<{
-    id: string;
-    version_id: string;
-    status: string;
-    updated_at: string;
-  }> {
-    return this.request('PATCH', `/templates/${id}`, data);
-  }
-
-  async getTemplate(id: string): Promise<Record<string, unknown>> {
-    return this.request('GET', `/templates/${id}`);
-  }
-
-  async listTemplates(): Promise<{ data: Record<string, unknown>[] }> {
-    return this.request('GET', '/templates');
-  }
+  // ── Public API endpoints (api.resend.com) ─────────────────────────
 
   async connectEditor(data: {
     resourceType: 'broadcast' | 'template';
     resourceId: string;
     agentName?: string;
   }): Promise<{ token: string; roomId: string }> {
-    return this.request('POST', '/editor/connect', data);
+    return this.apiRequest('POST', '/editor/connect', data);
   }
 
   async disconnectEditor(data: {
@@ -139,6 +101,34 @@ export class DashboardClient {
     resourceId: string;
     agentName?: string;
   }): Promise<{ ok: boolean }> {
-    return this.request('POST', '/editor/disconnect', data);
+    return this.apiRequest('POST', '/editor/disconnect', data);
+  }
+
+  /**
+   * Update a broadcast with TipTap content via the public API.
+   * The public API handles Liveblocks room sync and broadcast events.
+   */
+  async updateBroadcastContent(
+    id: string,
+    data: {
+      content: Record<string, unknown>;
+      session_name?: string;
+    },
+  ): Promise<{ id: string; object: string }> {
+    return this.apiRequest('PATCH', `/broadcasts/${id}`, data);
+  }
+
+  /**
+   * Update a template with TipTap content via the public API.
+   * The public API handles Liveblocks room sync and broadcast events.
+   */
+  async updateTemplateContent(
+    id: string,
+    data: {
+      content: Record<string, unknown>;
+      session_name?: string;
+    },
+  ): Promise<{ id: string; object: string }> {
+    return this.apiRequest('PATCH', `/templates/${id}`, data);
   }
 }

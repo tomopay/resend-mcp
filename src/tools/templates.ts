@@ -1,9 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { Resend } from 'resend';
 import { z } from 'zod';
 import type { DashboardClient } from '../lib/dashboard-client.js';
 
 export function addTemplateTools(
   server: McpServer,
+  resend: Resend,
   {
     dashboard,
     getAgentName,
@@ -29,14 +31,14 @@ export function addTemplateTools(
 
 **NOT for:** Sending a one-off email (use send-email). Not for broadcast campaigns (use create-broadcast).
 
-**Returns:** Template ID and version ID.
+**Returns:** Template ID.
 
 **When to use:**
 - User wants to create a reusable email template
 - User says "create a template", "make a template", "new email template"
 - Supports TipTap JSON content for visual editing in the dashboard
 
-**Workflow:** get-tiptap-schema (if using content) → create-template → update-template (optional) → publish-template`,
+**Workflow:** get-tiptap-schema (if using content) → create-template → update-template (optional)`,
       inputSchema: {
         name: z
           .string()
@@ -46,7 +48,10 @@ export function addTemplateTools(
           ),
         subject: z.string().optional().describe('Email subject line'),
         from: z.string().optional().describe('From email address'),
-        html: z.string().optional().describe('HTML content of the email'),
+        html: z
+          .string()
+          .nonempty()
+          .describe('HTML content of the email'),
         text: z
           .string()
           .optional()
@@ -55,10 +60,6 @@ export function addTemplateTools(
           .array(z.string())
           .optional()
           .describe('Reply-to email address(es)'),
-        previewText: z
-          .string()
-          .optional()
-          .describe('Preview text for the email'),
         content: z
           .record(z.string(), z.unknown())
           .optional()
@@ -67,30 +68,33 @@ export function addTemplateTools(
           ),
       },
     },
-    async ({ name, subject, from, html, text, replyTo, previewText, content }) => {
-      if (!dashboard) {
-        throw new Error(
-          'Dashboard integration not configured. Provide a Resend API key to enable template management.',
-        );
-      }
-
-      const result = await dashboard.createTemplate({
+    async ({ name, subject, from, html, text, replyTo, content }) => {
+      const response = await resend.templates.create({
         name,
-        content,
         subject,
         from,
         html,
         text,
-        reply_to: replyTo,
-        preview_text: previewText,
+        replyTo,
       });
 
-      if (content && withEditorSession) {
+      if (response.error) {
+        throw new Error(
+          `Failed to create template: ${JSON.stringify(response.error)}`,
+        );
+      }
+
+      // If TipTap content was provided, push it to the Liveblocks room
+      if (content && dashboard && withEditorSession) {
         const agentName = getAgentName?.();
         await withEditorSession(
-          { resourceType: 'template', resourceId: result.id, agentName },
+          {
+            resourceType: 'template',
+            resourceId: response.data.id,
+            agentName,
+          },
           () =>
-            dashboard.updateTemplate(result.id, {
+            dashboard.updateTemplateContent(response.data.id, {
               content,
               session_name: agentName,
             }),
@@ -99,12 +103,8 @@ export function addTemplateTools(
 
       return {
         content: [
-          {
-            type: 'text',
-            text: 'Template created successfully.',
-          },
-          { type: 'text', text: `ID: ${result.id}` },
-          { type: 'text', text: `Version ID: ${result.version_id}` },
+          { type: 'text', text: 'Template created successfully.' },
+          { type: 'text', text: `ID: ${response.data.id}` },
         ],
       };
     },
@@ -121,34 +121,32 @@ export function addTemplateTools(
       },
     },
     async ({ id }) => {
-      if (!dashboard) {
+      const response = await resend.templates.get(id);
+
+      if (response.error) {
         throw new Error(
-          'Dashboard integration not configured. Provide a Resend API key.',
+          `Failed to get template: ${JSON.stringify(response.error)}`,
         );
       }
 
-      const template = await dashboard.getTemplate(id);
-
+      const t = response.data;
       const details = [
-        `ID: ${template.id}`,
-        `Name: ${template.name}`,
-        template.version_id && `Version ID: ${template.version_id}`,
-        template.subject && `Subject: ${template.subject}`,
-        template.from && `From: ${template.from}`,
-        template.reply_to && `Reply-to: ${(template.reply_to as string[]).join(', ')}`,
-        template.preview_text && `Preview text: ${template.preview_text}`,
-        `Status: ${template.status}`,
-        `Created at: ${template.created_at}`,
-        template.updated_at && `Updated at: ${template.updated_at}`,
-        template.published_at && `Published at: ${template.published_at}`,
+        `ID: ${t.id}`,
+        `Name: ${t.name}`,
+        t.subject && `Subject: ${t.subject}`,
+        t.from && `From: ${t.from}`,
+        t.reply_to && `Reply-to: ${t.reply_to.join(', ')}`,
+        `Status: ${t.status}`,
+        `Created at: ${t.created_at}`,
+        t.updated_at && `Updated at: ${t.updated_at}`,
       ]
         .filter(Boolean)
         .join('\n');
 
       let fullDetails = details;
-      fullDetails += `\n\n--- Plain Text Content ---\n${(template.text as string) || '(none)'}`;
-      if (template.html) {
-        fullDetails += `\n\n--- HTML Content ---\n${template.html}`;
+      fullDetails += `\n\n--- Plain Text Content ---\n${t.text || '(none)'}`;
+      if (t.html) {
+        fullDetails += `\n\n--- HTML Content ---\n${t.html}`;
       }
 
       return {
@@ -167,14 +165,15 @@ export function addTemplateTools(
       inputSchema: {},
     },
     async () => {
-      if (!dashboard) {
+      const response = await resend.templates.list();
+
+      if (response.error) {
         throw new Error(
-          'Dashboard integration not configured. Provide a Resend API key.',
+          `Failed to list templates: ${JSON.stringify(response.error)}`,
         );
       }
 
-      const response = await dashboard.listTemplates();
-      const templatesList = response.data;
+      const templatesList = response.data.data;
 
       return {
         content: [
@@ -219,10 +218,6 @@ export function addTemplateTools(
           .array(z.string())
           .optional()
           .describe('Reply-to email address(es)'),
-        previewText: z
-          .string()
-          .optional()
-          .describe('Preview text for the email'),
         content: z
           .record(z.string(), z.unknown())
           .optional()
@@ -231,51 +226,67 @@ export function addTemplateTools(
           ),
       },
     },
-    async ({
-      id,
-      name,
-      subject,
-      from,
-      html,
-      text,
-      replyTo,
-      previewText,
-      content,
-    }) => {
-      if (!dashboard) {
+    async ({ id, name, subject, from, html, text, replyTo, content }) => {
+      const response = await resend.templates.update(id, {
+        name,
+        subject,
+        from,
+        html,
+        text,
+        replyTo,
+      });
+
+      if (response.error) {
         throw new Error(
-          'Dashboard integration not configured. Provide a Resend API key.',
+          `Failed to update template: ${JSON.stringify(response.error)}`,
         );
       }
 
-      const agentName = getAgentName?.();
-
-      const doUpdate = () =>
-        dashboard.updateTemplate(id, {
-          name,
-          content,
-          subject,
-          from,
-          html,
-          text,
-          reply_to: replyTo,
-          preview_text: previewText,
-          session_name: agentName,
-        });
-
-      const result =
-        content && withEditorSession
-          ? await withEditorSession(
-              { resourceType: 'template', resourceId: id, agentName },
-              doUpdate,
-            )
-          : await doUpdate();
+      // If TipTap content was provided, push it to the Liveblocks room
+      if (content && dashboard && withEditorSession) {
+        const agentName = getAgentName?.();
+        await withEditorSession(
+          { resourceType: 'template', resourceId: id, agentName },
+          () =>
+            dashboard.updateTemplateContent(id, {
+              content,
+              session_name: agentName,
+            }),
+        );
+      }
 
       return {
         content: [
           { type: 'text', text: 'Template updated successfully.' },
-          { type: 'text', text: `ID: ${result.id}` },
-          { type: 'text', text: `Version ID: ${result.version_id}` },
+          { type: 'text', text: `ID: ${response.data.id}` },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    'remove-template',
+    {
+      title: 'Remove Template',
+      description:
+        'Remove a template by ID. Before using this tool, you MUST double-check with the user that they want to remove this template. Warn the user that removing a template is irreversible.',
+      inputSchema: {
+        id: z.string().nonempty().describe('Template ID'),
+      },
+    },
+    async ({ id }) => {
+      const response = await resend.templates.remove(id);
+
+      if (response.error) {
+        throw new Error(
+          `Failed to remove template: ${JSON.stringify(response.error)}`,
+        );
+      }
+
+      return {
+        content: [
+          { type: 'text', text: 'Template removed successfully.' },
+          { type: 'text', text: `ID: ${response.data.id}` },
         ],
       };
     },

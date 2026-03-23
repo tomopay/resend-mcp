@@ -31,7 +31,7 @@ export function createMcpServer(
   });
 
   const dashboard = apiKey
-    ? new DashboardClient(apiKey, dashboardUrl)
+    ? new DashboardClient(apiKey, { dashboardUrl })
     : undefined;
 
   const { getActiveConnection, withEditorSession } = addEditorTools(
@@ -52,7 +52,7 @@ export function createMcpServer(
   addDomainTools(server, resend);
   addEmailTools(server, resend, { senderEmailAddress, replierEmailAddresses });
   addSegmentTools(server, resend);
-  addTemplateTools(server, {
+  addTemplateTools(server, resend, {
     dashboard,
     getAgentName: () => getActiveConnection()?.agentName,
     withEditorSession,
