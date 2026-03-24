@@ -159,6 +159,42 @@ describe('resolveConfig', () => {
     }
   });
 
+  it('includes dashboardUrl from --dashboard-url', () => {
+    const parsed = parseArgs(['--key', 're_x', '--dashboard-url', 'https://resend.com']);
+    const result = resolveConfig(parsed, {});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.config.dashboardUrl).toBe('https://resend.com');
+    }
+  });
+
+  it('includes dashboardUrl from RESEND_DASHBOARD_URL', () => {
+    const parsed = parseArgs(['--key', 're_x']);
+    const result = resolveConfig(parsed, { RESEND_DASHBOARD_URL: 'https://resend.com' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.config.dashboardUrl).toBe('https://resend.com');
+    }
+  });
+
+  it('--dashboard-url overrides RESEND_DASHBOARD_URL', () => {
+    const parsed = parseArgs(['--key', 're_x', '--dashboard-url', 'https://cli.resend.com']);
+    const result = resolveConfig(parsed, { RESEND_DASHBOARD_URL: 'https://env.resend.com' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.config.dashboardUrl).toBe('https://cli.resend.com');
+    }
+  });
+
+  it('defaults dashboardUrl to undefined when not set', () => {
+    const parsed = parseArgs(['--key', 're_x']);
+    const result = resolveConfig(parsed, {});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.config.dashboardUrl).toBeUndefined();
+    }
+  });
+
   it('invalid or out-of-range port falls back to default', () => {
     const invalid = resolveConfig(
       parseArgs(['--key', 're_x', '--http', '--port', 'not-a-number']),

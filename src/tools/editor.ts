@@ -30,7 +30,7 @@ export function addEditorTools(
     }
 
     try {
-      await apiClient.connectEditor(conn);
+      await apiClient.createEditorConnection(conn);
       activeConnection = conn;
     } catch {
       // best-effort — proceed even if connect fails
@@ -40,7 +40,7 @@ export function addEditorTools(
       return await fn();
     } finally {
       try {
-        await apiClient.disconnectEditor(conn);
+        await apiClient.deleteEditorConnection(conn);
       } catch {
         // best-effort
       }
@@ -110,7 +110,7 @@ export function addEditorTools(
         );
       }
 
-      const result = await apiClient.connectEditor({
+      const result = await apiClient.createEditorConnection({
         resourceType,
         resourceId,
         agentName,
@@ -122,6 +122,7 @@ export function addEditorTools(
         content: [
           { type: 'text', text: 'Connected to editor successfully.' },
           { type: 'text', text: `Room ID: ${result.roomId}` },
+          { type: 'text', text: `Token: ${result.token}` },
         ],
       };
     },
@@ -150,7 +151,7 @@ export function addEditorTools(
         };
       }
 
-      await apiClient.disconnectEditor({
+      await apiClient.deleteEditorConnection({
         resourceType: activeConnection.resourceType,
         resourceId: activeConnection.resourceId,
         agentName: activeConnection.agentName,

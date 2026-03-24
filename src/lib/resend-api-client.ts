@@ -36,20 +36,20 @@ export class ResendApiClient {
     return response.json() as Promise<T>;
   }
 
-  async connectEditor(data: {
+  async createEditorConnection(data: {
     resourceType: 'broadcast' | 'template';
     resourceId: string;
     agentName?: string;
   }): Promise<{ token: string; roomId: string }> {
-    return this.apiRequest('POST', '/editor/connect', data);
+    return this.apiRequest('POST', '/editor/connections', data);
   }
 
-  async disconnectEditor(data: {
+  async deleteEditorConnection(data: {
     resourceType: 'broadcast' | 'template';
     resourceId: string;
     agentName?: string;
   }): Promise<{ ok: boolean }> {
-    return this.apiRequest('POST', '/editor/disconnect', data);
+    return this.apiRequest('DELETE', '/editor/connections', data);
   }
 
   /**

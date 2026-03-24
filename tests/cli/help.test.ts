@@ -13,6 +13,8 @@ describe('help', () => {
     expect(HELP_TEXT).toContain('-h, --help');
     expect(HELP_TEXT).toContain('RESEND_API_KEY');
     expect(HELP_TEXT).toContain('MCP_PORT');
+    expect(HELP_TEXT).toContain('--dashboard-url');
+    expect(HELP_TEXT).toContain('RESEND_DASHBOARD_URL');
   });
 
   it('printHelp writes HELP_TEXT to console.error', () => {

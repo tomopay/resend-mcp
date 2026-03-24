@@ -117,6 +117,12 @@ export function addBroadcastTools(
         throw new Error('replyTo argument must be provided.');
       }
 
+      if (content && (html || text)) {
+        throw new Error(
+          'Cannot use content together with html or text. Use content for TipTap editable email, or html/text for static email.',
+        );
+      }
+
       const response = await resend.broadcasts.create({
         name,
         audienceId,
@@ -398,6 +404,12 @@ export function addBroadcastTools(
       previewText,
       content,
     }) => {
+      if (content && (html || text)) {
+        throw new Error(
+          'Cannot use content together with html or text. Use content for TipTap editable email, or html/text for static email.',
+        );
+      }
+
       const response = await resend.broadcasts.update(id, {
         name,
         audienceId,
