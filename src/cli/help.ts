@@ -12,6 +12,7 @@ Options:
   --reply-to <email>       Reply-to; repeat for multiple (or REPLY_TO_EMAIL_ADDRESSES)
   --http                   Run HTTP server (Streamable HTTP at /mcp) instead of stdio
   --port <number>          HTTP port when using --http (default: 3000, or MCP_PORT)
+  --dashboard-url <url>    Dashboard URL (or RESEND_DASHBOARD_URL)
   -h, --help               Show this help
 
 Environment:
@@ -19,6 +20,7 @@ Environment:
   SENDER_EMAIL_ADDRESS     Optional
   REPLY_TO_EMAIL_ADDRESSES Optional, comma-separated
   MCP_PORT                 HTTP port when using --http (optional)
+  RESEND_DASHBOARD_URL     Dashboard URL (optional)
 `.trim();
 
 export function printHelp(): void {

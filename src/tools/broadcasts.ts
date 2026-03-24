@@ -150,7 +150,7 @@ export function addBroadcastTools(
             agentName,
           },
           () =>
-            apiClient.updateBroadcastContent(response.data.id, {
+            apiClient.composeBroadcastContent(response.data.id, {
               content,
               session_name: agentName,
             }),
@@ -433,7 +433,7 @@ export function addBroadcastTools(
         await withEditorSession(
           { resourceType: 'broadcast', resourceId: id, agentName },
           () =>
-            apiClient.updateBroadcastContent(id, {
+            apiClient.composeBroadcastContent(id, {
               content,
               session_name: agentName,
             }),

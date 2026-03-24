@@ -94,7 +94,7 @@ export function addTemplateTools(
             agentName,
           },
           () =>
-            apiClient.updateTemplateContent(response.data.id, {
+            apiClient.composeTemplateContent(response.data.id, {
               content,
               session_name: agentName,
             }),
@@ -248,7 +248,7 @@ export function addTemplateTools(
         await withEditorSession(
           { resourceType: 'template', resourceId: id, agentName },
           () =>
-            apiClient.updateTemplateContent(id, {
+            apiClient.composeTemplateContent(id, {
               content,
               session_name: agentName,
             }),

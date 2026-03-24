@@ -10,7 +10,7 @@ export class DashboardClient {
   }
 
   async getTiptapSchema(): Promise<{ prompt: string; version: string }> {
-    const url = `${this.dashboardUrl}/static/tiptap-schema.json`;
+    const url = `${this.dashboardUrl}/api/editor/schema?name=tiptap-schema`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(

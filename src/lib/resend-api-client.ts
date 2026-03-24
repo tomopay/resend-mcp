@@ -53,30 +53,34 @@ export class ResendApiClient {
   }
 
   /**
-   * Update a broadcast with TipTap content via the public API.
-   * The public API handles Liveblocks room sync and broadcast events.
+   * Compose a broadcast from TipTap content via the public API.
+   * The API generates HTML/text from the TipTap JSON, saves content, and
+   * syncs changes to Liveblocks for real-time collaboration.
    */
-  async updateBroadcastContent(
+  async composeBroadcastContent(
     id: string,
     data: {
       content: Record<string, unknown>;
+      preview_text?: string;
       session_name?: string;
     },
   ): Promise<{ id: string; object: string }> {
-    return this.apiRequest('PATCH', `/broadcasts/${id}`, data);
+    return this.apiRequest('POST', `/broadcasts/${id}/compose`, data);
   }
 
   /**
-   * Update a template with TipTap content via the public API.
-   * The public API handles Liveblocks room sync and broadcast events.
+   * Compose a template from TipTap content via the public API.
+   * The API generates HTML/text from the TipTap JSON, saves content, and
+   * syncs changes to Liveblocks for real-time collaboration.
    */
-  async updateTemplateContent(
+  async composeTemplateContent(
     id: string,
     data: {
       content: Record<string, unknown>;
+      preview_text?: string;
       session_name?: string;
     },
   ): Promise<{ id: string; object: string }> {
-    return this.apiRequest('PATCH', `/templates/${id}`, data);
+    return this.apiRequest('POST', `/templates/${id}/compose`, data);
   }
 }
